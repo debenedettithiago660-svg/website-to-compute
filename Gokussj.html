@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Goku 3D - Habitación del Tiempo</title>
+<style>
+  body { margin: 0; overflow: hidden; }
+  canvas { display: block; }
+  .button { 
+    position: fixed; width: 60px; height: 60px; 
+    background: rgba(255,255,255,0.5); border-radius: 10px; 
+    text-align: center; line-height: 60px; font-size: 24px; 
+    user-select: none; 
+  }
+  #up { bottom: 120px; left: 80px; }
+  #down { bottom: 40px; left: 80px; }
+  #left { bottom: 80px; left: 20px; }
+  #right { bottom: 80px; left: 140px; }
+  #transform { bottom: 80px; right: 40px; width:80px; height:80px; line-height:80px; }
+  #punch { bottom: 160px; right: 40px; }
+  #ki { bottom: 240px; right: 40px; }
+</style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+
+<!-- Botones táctiles -->
+<div id="up" class="button">↑</div>
+<div id="down" class="button">↓</div>
+<div id="left" class="button">←</div>
+<div id="right" class="button">→</div>
+<div id="transform" class="button">SS</div>
+<div id="punch" class="button">👊</div>
+<div id="ki" class="button">⚡</div>
+
+<script>
+// Escena, cámara, render
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 5, 10);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Luces
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,10,5);
+scene.add(light);
+const ambient = new THREE.AmbientLight(0x555555);
+scene.add(ambient);
+
+// Controles de cámara
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableZoom = false;
+
+// Suelo y paredes
+const floor = new THREE.Mesh(new THREE.BoxGeometry(20,1,20), new THREE.MeshStandardMaterial({color:0x4444aa}));
+floor.position.y=-0.5; scene.add(floor);
+
+const wallMat = new THREE.MeshStandardMaterial({color:0x222288});
+const wallsPos = [[0,4.5,-10],[0,4.5,10],[-10,4.5,0],[10,4.5,0]];
+const wallsScale = [[20,9,1],[20,9,1],[1,9,20],[1,9,20]];
+for(let i=0;i<4;i++){
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(...wallsScale[i]), wallMat);
+  wall.position.set(...wallsPos[i]);
+  scene.add(wall);
+}
+
+// Goku
+const goku = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshStandardMaterial({color:0x0000ff}));
+goku.position.y=1; scene.add(goku);
+
+// Aura
+const aura = new THREE.Mesh(new THREE.SphereGeometry(1.5,32,32), new THREE.MeshBasicMaterial({color:0xffff00, transparent:true, opacity:0.5}));
+aura.position.y=1; aura.visible=false; scene.add(aura);
+
+// Poder de energía (esfera)
+const kiSphere = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16), new THREE.MeshBasicMaterial({color:0x00ffff}));
+kiSphere.visible=false; scene.add(kiSphere);
+
+// Movimiento
+let move = {up:false, down:false, left:false, right:false};
+document.getElementById('up').addEventListener('touchstart', ()=>move.up=true); document.getElementById('up').addEventListener('touchend', ()=>move.up=false);
+document.getElementById('down').addEventListener('touchstart', ()=>move.down=true); document.getElementById('down').addEventListener('touchend', ()=>move.down=false);
+document.getElementById('left').addEventListener('touchstart', ()=>move.left=true); document.getElementById('left').addEventListener('touchend', ()=>move.left=false);
+document.getElementById('right').addEventListener('touchstart', ()=>move.right=true); document.getElementById('right').addEventListener('touchend', ()=>move.right=false);
+
+// Transformación
+let superSaiyan=false;
+document.getElementById('transform').addEventListener('touchstart', ()=>{
+  superSaiyan = !superSaiyan;
+  goku.material.color.set(superSaiyan ? 0xffff00 : 0x0000ff);
+  aura.visible = superSaiyan;
+});
+
+// Golpe
+let punching=false;
+document.getElementById('punch').addEventListener('touchstart', ()=>{
+  punching=true;
+  goku.scale.x=1.3; setTimeout(()=>{goku.scale.x=1; punching=false;},200);
+});
+
+// Poder de ki
+let kiActive=false;
+document.getElementById('ki').addEventListener('touchstart', ()=>{
+  kiActive=true; kiSphere.position.copy(goku.position); kiSphere.visible=true;
+  setTimeout(()=>{kiSphere.visible=false; kiActive=false;},800);
+});
+
+// Animación
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  const speed = 5*delta;
+  if(move.up) goku.position.z -= speed;
+  if(move.down) goku.position.z += speed;
+  if(move.left) goku.position.x -= speed;
+  if(move.right) goku.position.x += speed;
+
+  aura.position.copy(goku.position);
+  if(kiActive) kiSphere.position.z -= delta*10;
+  
+  controls.target.copy(goku.position);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// Ajuste ventana
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
+
+
+---
+
+✅ Cómo jugarlo en Android ahora
+
+1. Copia todo el código en un archivo llamado goku3d.html.
+
+
+2. Transfiérelo a tu Android o súbelo a Google Drive.
+
+
+3. Abre Chrome en tu Android y navega hasta el archivo (ejemplo: file:///storage/emulated/0/Download/goku3d.html).
+
+
+
+🎮 Controles táctiles
+
+Flechas → mover a Goku
+
+SS → Transformarse Super Saiyajin
+
+👊 → Golpe
+
+⚡ → Poder de ki (esfera que dispara hacia adelante)
+
+Desliza con el dedo → girar la cámara
+
+
+
+---
+
